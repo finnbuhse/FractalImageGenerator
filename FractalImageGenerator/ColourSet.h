@@ -20,6 +20,10 @@ public:
 	ColourSet(const ColourSet& other);
 
 	cv::Vec3b operator[](const unsigned int index);
+
+	cv::Vec3b sample(const float value, const bool invert = false);
+
+	cv::Vec3b quickSample(const float value, const bool invert = false);
 };
 
 const ColourSet magmaColourSet(256, magma);

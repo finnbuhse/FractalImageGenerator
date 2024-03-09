@@ -15,29 +15,6 @@ void FractalImageGenerator::setColourSet(const ColourSet& colourSet)
 	mColourSet = colourSet;
 }
 
-void FractalImageGenerator::generateFractalImageRegion(const Region computeRegion, const unsigned int maximumIterations, cv::Mat* const image, const UIRegion imageRegion, const FractalColourFunction& colourFunction)
-{
-	float pixelRangeX = computeRegion.xBounds.range() / image->cols;
-	float pixelRangeY = computeRegion.yBounds.range() / image->rows;
-
-	for (unsigned int imageX = imageRegion.xBounds.minimum; imageX < imageRegion.xBounds.maximum; imageX++)
-	{
-		for (unsigned int imageY = imageRegion.yBounds.minimum; imageY < imageRegion.yBounds.maximum; imageY++)
-		{
-			// The origin for image coordinates is at the top left
-			// Get cartesian coordinates where the origin is at the bottom left
-			float cartesianX = computeRegion.xBounds.minimum + ((float)imageX * pixelRangeX);
-			float cartesianY = computeRegion.yBounds.minimum + ((float)(image->rows - imageY - 1) * pixelRangeY);
-
-			// Custom algorithm
-			float colourNormalised = colourFunction(cartesianX, cartesianY, maximumIterations);
-
-			unsigned char colour = colourNormalised * 255;
-			image->at<cv::Vec3b>(imageY, imageX) = mColourSet[colour];
-		}
-	}
-}
-
 std::vector<UIRegion> FractalImageGenerator::getWorkerThreadImageRegions(const unsigned int imageWidth, const unsigned int imageHeight, const unsigned int sqrtNThreads)
 {
 	std::vector<UIRegion> result;
@@ -53,6 +30,40 @@ std::vector<UIRegion> FractalImageGenerator::getWorkerThreadImageRegions(const u
 	}
 
 	return result;
+}
+
+void FractalImageGenerator::generateFractalImageRegion(const Region computeRegion, const unsigned int maximumIterations, cv::Mat* const image, const UIRegion imageRegion, const FractalColourFunction& colourFunction)
+{
+	float pixelRangeX = computeRegion.xBounds.range() / (image->cols - 1);
+	float pixelRangeY = computeRegion.yBounds.range() / (image->rows - 1);
+
+	float cartesianX;
+	float cartesianY;
+
+	for (unsigned int imageX = imageRegion.xBounds.minimum; imageX < imageRegion.xBounds.maximum; imageX++)
+	{
+		for (unsigned int imageY = imageRegion.yBounds.minimum; imageY < imageRegion.yBounds.maximum; imageY++)
+		{
+			// The origin for image coordinates is at the top left
+			// Get cartesian coordinates where the origin is at the bottom left
+			cartesianX = computeRegion.xBounds.minimum + ((float)imageX * pixelRangeX);
+			cartesianY = computeRegion.yBounds.minimum + ((float)(image->rows - imageY - 1) * pixelRangeY);
+
+			// Sample colour set using custom colour function
+			image->at<cv::Vec3b>(imageY, imageX) = mColourSet.sample(colourFunction(cartesianX, cartesianY, maximumIterations));
+		}
+	}
+}
+
+cv::Mat* FractalImageGenerator::generateFractalImageSt(const Region computeRegion, const unsigned int maximumIterations, const unsigned int resolution)
+{
+	float aspectRatio = computeRegion.xBounds.range() / computeRegion.yBounds.range();
+
+	cv::Mat* image = createImage(/* Width */ (unsigned int)(aspectRatio * (float)resolution), /* Height */ resolution, CV_8UC3, cv::Scalar(255, 255, 255));
+
+	generateFractalImageRegion(computeRegion, maximumIterations, image, UIRegion{ {0, (unsigned int)image->cols}, {0, (unsigned int)image->rows} }, mandelbrotColourFunction);
+
+	return image;
 }
 
 void FractalImageGenerator::createWorkerThreads(const Region computeRegion, const unsigned int maximumIterations, cv::Mat* image, const unsigned int maximumThreads, std::vector<std::unique_ptr<std::thread>>& threadsOut)
@@ -77,21 +88,35 @@ void FractalImageGenerator::joinWorkerThreads(std::vector<std::unique_ptr<std::t
 	}
 }
 
-
-cv::Mat* FractalImageGenerator::generateFractalImageMt(const Region computeRegion, const unsigned int maximumIterations, const unsigned int resolution, const unsigned int maximumThreads)
+cv::Mat* FractalImageGenerator::generateFractalImageMt(const Region computeRegion, const unsigned int maximumIterations, const unsigned int targetResolution, const unsigned int maximumThreads)
 {
+	assert(("[ERROR] Compute region invalid", computeRegion.xBounds.maximum > computeRegion.xBounds.minimum));
+	assert(("[ERROR] Compute region invalid", computeRegion.yBounds.maximum > computeRegion.yBounds.minimum));
+
 	float aspectRatio = computeRegion.xBounds.range() / computeRegion.yBounds.range();
 
-	cv::Mat* image = createImage(/* Width */ (unsigned int)(aspectRatio * (float)resolution), /* Height */ resolution, CV_8UC3, cv::Scalar(255, 255, 255));
+	unsigned int sqrtMaxThreads = std::sqrt((float)maximumThreads);
+	
+	// Make image dimensions multiples of sqrtMaxThreads
+	// This is so the image can be split into even portions for each thread
+	unsigned int resolution = std::floor((float)targetResolution / (float)sqrtMaxThreads) * sqrtMaxThreads;
+	unsigned int width = std::floor((aspectRatio * (float)resolution) / (float)sqrtMaxThreads) * sqrtMaxThreads;
 
-	const unsigned int imageWidth = image->cols;
-	const unsigned int imageHeight = image->rows;
+	cv::Mat* image = createImage(/* Width */ width, /* Height */ resolution, CV_8UC3, cv::Scalar(255, 255, 255));
 
 	std::vector<std::unique_ptr<std::thread>> threads;
 	createWorkerThreads(computeRegion, maximumIterations, image, maximumThreads, threads);
 	joinWorkerThreads(threads);
 
 	return image;
+}
+
+void FractalImageGenerator::destroyImages()
+{
+	for (unsigned int i = 0; i < mImages.size(); i++)
+	{
+		mImages.erase(mImages.begin() + i);
+	}
 }
 
 float mandelbrotColourFunction(float x, float y, float maximumIterations)

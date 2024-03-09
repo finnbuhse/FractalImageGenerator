@@ -25,19 +25,19 @@ include_directories(
 )
 
 
-add_executable (Fractal  "Main.cpp" "FractalImageGenerator.cpp" "ColourSet.cpp" "Complex.cpp" "FractalImageGenerator.h" "ColourSet.h" "Bounds.h" "Complex.h")
+add_executable (FractalImageGenerator  "Main.cpp" "FractalImageGenerator.cpp" "ColourSet.cpp" "Complex.cpp" "FractalImageGenerator.h" "ColourSet.h" "Bounds.h" "Complex.h")
 
-target_link_directories(Fractal PRIVATE 
+target_link_directories(FractalImageGenerator PRIVATE 
 	F:/Projects/opencv/out/lib/Debug
 )
 
-target_link_libraries(Fractal PRIVATE
+target_link_libraries(FractalImageGenerator PRIVATE
 	opencv_core490d
 	opencv_imgcodecs490d
 )
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET Fractal PROPERTY CXX_STANDARD 20)
+  set_property(TARGET FractalImageGenerator PROPERTY CXX_STANDARD 20)
 endif()
 
 # TODO: Add tests and install targets if needed.

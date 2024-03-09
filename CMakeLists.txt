@@ -9,9 +9,9 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
-project ("Fractal")
+project ("FractalImageGenerator")
 
 set(CMAKE_CXX_STANDARD 20)
 
 # Include sub-projects.
-add_subdirectory ("Fractal")
+add_subdirectory ("FractalImageGenerator")
